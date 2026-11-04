@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a frontend-only, API-isolated snapshot of ZapFormat/dev."""
+"""Publish a frontend-only, API-isolated snapshot of ZapFormat/design-preview."""
 import json
 import shutil
 import subprocess
@@ -10,7 +10,7 @@ public = Path("public")
 if public.exists():
     shutil.rmtree(public)
 public.mkdir()
-for filename in ("index.html", "styles.css", "app.js", "config.js", "admin-desk.js"):
+for filename in ("index.html", "styles.css", "premium.css", "app.js", "config.js", "admin-desk.js"):
     path = source / filename
     if not path.is_file():
         raise RuntimeError(f"Required frontend file missing: {filename}")
@@ -27,7 +27,7 @@ for directory in ("admin", "assets", "images", "img", "fonts", "icons"):
 )
 sha = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
 (public / "preview-version.json").write_text(
-    json.dumps({"source_branch": "dev", "sha": sha}, ensure_ascii=False),
+    json.dumps({"source_branch": "design-preview", "sha": sha}, ensure_ascii=False),
     encoding="utf-8",
 )
 (public / ".nojekyll").touch()
