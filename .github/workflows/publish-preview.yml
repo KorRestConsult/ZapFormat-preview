@@ -25,8 +25,8 @@ jobs:
     steps:
       - name: Checkout preview infrastructure
         uses: actions/checkout@v4
-      - name: Checkout original ZapFormat dev branch
-        run: git clone --quiet --depth 1 --single-branch --branch dev https://github.com/KorRestConsult/ZapFormat.git source
+      - name: Checkout original ZapFormat design-preview branch
+        run: git clone --quiet --depth 1 --single-branch --branch design-preview https://github.com/KorRestConsult/ZapFormat.git source
       - name: Validate source JavaScript
         run: |
           node --check source/app.js
