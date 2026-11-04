@@ -1,0 +1,55 @@
+name: ZapFormat safe preview
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/build_preview.py'
+      - '.github/workflows/publish-preview.yml'
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: zapformat-safe-preview
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout preview infrastructure
+        uses: actions/checkout@v4
+      - name: Checkout original ZapFormat dev branch
+        run: git clone --quiet --depth 1 --single-branch --branch dev https://github.com/KorRestConsult/ZapFormat.git source
+      - name: Validate source JavaScript
+        run: |
+          node --check source/app.js
+          node --check source/config.js
+          node --check source/admin-desk.js
+          node --check source/admin/admin.js
+      - name: Assemble frontend-only preview without production connections
+        run: python3 tools/build_preview.py
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload sanitized frontend preview
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy separate preview URL
+        id: deployment
+        uses: actions/deploy-pages@v4
