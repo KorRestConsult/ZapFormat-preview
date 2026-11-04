@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Publish a frontend-only, API-isolated snapshot of ZapFormat/design-preview."""
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -26,14 +27,22 @@ for directory in ("admin", "assets", "images", "img", "fonts", "icons"):
     encoding="utf-8",
 )
 sha = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
+infra_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+version = sha[:12] + "-" + infra_sha[:12]
 (public / "preview-version.json").write_text(
-    json.dumps({"source_branch": "design-preview", "sha": sha}, ensure_ascii=False),
+    json.dumps({"source_branch": "design-preview", "sha": version, "source_sha": sha}, ensure_ascii=False),
     encoding="utf-8",
 )
 (public / ".nojekyll").touch()
 
 def patch_html(path: Path, root: bool = False):
     content = path.read_text(encoding="utf-8")
+    # Pin CSS and JS to this build so iPad Safari does not reuse stale assets.
+    content = re.sub(
+        r'(?P<asset>(?:\.\.?/)[^\s"\']+\.(?:css|js))\?v=',
+        lambda m: m.group("asset") + "?preview_build=" + version + "&v=",
+        content,
+    )
     if "</head>" not in content:
         raise RuntimeError(f"Cannot insert preview safety headers in {path}")
     safety = (
@@ -55,11 +64,16 @@ def patch_html(path: Path, root: bool = False):
     content = content.replace("</body>", label + "</body>", 1)
     if root:
         poll = (
-            '<script>(function(){const current='+json.dumps(sha)+';'
-            'setInterval(async function(){try{'
+            '<script>(function(){const current='+json.dumps(version)+';'
+            'let busy=false;async function check(){if(busy)return;busy=true;try{'
             'const r=await fetch("./preview-version.json?t="+Date.now(),{cache:"no-store"});'
-            'if(!r.ok)return;const j=await r.json();if(j.sha!==current)location.reload();'
-            '}catch(e){}},20000);})();</script>'
+            'if(!r.ok)return;const j=await r.json();'
+            'if(j.sha&&j.sha!==current){const u=new URL(location.href);'
+            'u.searchParams.set("preview_build",j.sha);location.replace(u.href);}'
+            '}catch(e){}finally{busy=false;}}'
+            'setInterval(check,4000);window.addEventListener("focus",check);'
+            'document.addEventListener("visibilitychange",function(){if(!document.hidden)check();});'
+            '})();</script>'
         )
         content = content.replace("</body>", poll + "</body>", 1)
     path.write_text(content, encoding="utf-8")
